@@ -8,7 +8,7 @@ import time
 # #########################################################
 
 sel = selectors.DefaultSelector()
-ID   = "00065535"
+ID   = "1111111111111111"
 class Clients:
     def __init__(self, id, socket):
         self.id = id
@@ -41,8 +41,8 @@ def msg_read(client):
         seq_num   = data[48:64]
         message   = data[64:]
 
-        if msg_type == "00000011": # OI
-            print("[CONN] mensagem do tipo OI recebida")
+        if msg_type == "0000000000000011": # OI
+            print(f"[CONN] mensagem do tipo OI recebida de {origin_id}")
             new_id_flag = True
             for c in clients:
                 if c.id == origin_id:
@@ -61,15 +61,15 @@ def msg_read(client):
                     security_check == True
                     break
             if security_check == True:
-                if   msg_type == "00000010": # ERRO
+                if   msg_type == "0000000000000010": # ERRO
                     print("[ERROR] cliente não deveria mandar msgs do tipo ERRO ao servidor")
-                elif msg_type == "00000001": # OK
+                elif msg_type == "0000000000000001": # OK
                     print("[ACK] confirmação recebida")
                     for c in clients:
                         if c.id == destin_id:
                             c.wating = False
                             break
-                elif msg_type == "00000100": # FLW
+                elif msg_type == "0000000000000100": # FLW
                     print(f"[DCONN] desconectando cliente {origin_id}")
                     send_OK(origin_id, client, seq_num)
                     for c in clients:
@@ -78,7 +78,7 @@ def msg_read(client):
                             sel.unregister(c)
                             c.close()
                             break
-                elif msg_type == "00000101": # MSG
+                elif msg_type == "0000000000000101": # MSG
                     print(f"[MSG] mensagem recebida de {origin_id} para {destin_id}")
                     if destin_id == "00000000":
                         send_broadcast(origin_id, destin_id, message, client, seq_num)
@@ -105,22 +105,22 @@ def msg_read(client):
 # #########################################################
 
 def send_OK(id, cli, numseq):
-    str_msg = "00000001" + ID + id + numseq + "OK"
+    str_msg = "0000000000000001" + ID + id + numseq + "OK"
     sent = cli.send(str_msg.encode())
 
 def send_ERRO(id, cli, numseq):
-    str_msg = "00000010" + ID + id + numseq + "ERRO"
+    str_msg = "0000000000000010" + ID + id + numseq + "ERRO"
     sent = cli.send(str_msg.encode())
 
 def send_unicast(oid, did, msg, cli, numseq):
-    str_msg = "00000101" + oid + did + numseq + msg
+    str_msg = "0000000000000101" + oid + did + numseq + msg
     for c in clients:
         if c.id == did:
             tmp = c
             c.waiting = True
             break
     sent = cli.send(str_msg.encode())
-    while tmp.waiting:     # esperar pelo ack
+    while tmp.waiting:     # esperar pelo ack -> acho q vai ficr block por conta de como o main loop funfa
         time.sleep(1)
 
 def send_broadcast(oid, did, msg, cli, numseq):
@@ -130,7 +130,7 @@ def send_broadcast(oid, did, msg, cli, numseq):
     send_OK(oid, cli, numseq)
 
 def send_back(destin, num, msg, cli):
-    #str_msg = "00000101" + ID + destin + num + msg
+    #str_msg = "0000000000000101" + ID + destin + num + msg
     #sent = cli.send(str_msg.encode())
     print("[ERROR] destinatário não reconhecido")
     send_unicast(ID, destin, msg, cli, num)
