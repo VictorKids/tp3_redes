@@ -1,7 +1,7 @@
 import sys
 import socket
 import selectors
-import types
+import time
 
 # #########################################################
 # UTILITIES
@@ -17,15 +17,19 @@ class Clients:
 clients = []
 
 # #########################################################
-# ACCEPT, READ AND SEND FUNCTIONS
+# ACCEPT FUNCTION
 # #########################################################
 
 def accept_wrapper(sock):
     conn, addr = sock.accept()
-    print(f"[TEMP] recebendo conexão de {addr}")
+    print(f"[SYNC] recebendo conexão de {addr}")
     conn.setblocking(False)
     data = "oi_dorgival"
     sel.register(conn, selectors.EVENT_READ, data=data)
+
+# #########################################################
+# READ FUNCTION
+# #########################################################
 
 def msg_read(client):
     data = client.recv(1024)
@@ -38,6 +42,7 @@ def msg_read(client):
         message   = data[64:]
 
         if msg_type == "00000011": # OI
+            print("[CONN] mensagem do tipo OI recebida")
             new_id_flag = True
             for c in clients:
                 if c.id == origin_id:
@@ -56,15 +61,16 @@ def msg_read(client):
                     security_check == True
                     break
             if security_check == True:
-
                 if   msg_type == "00000010": # ERRO
                     print("[ERROR] cliente não deveria mandar msgs do tipo ERRO ao servidor")
                 elif msg_type == "00000001": # OK
+                    print("[ACK] confirmação recebida")
                     for c in clients:
                         if c.id == destin_id:
                             c.wating = False
                             break
                 elif msg_type == "00000100": # FLW
+                    print(f"[DCONN] desconectando cliente {origin_id}")
                     send_OK(origin_id, client, seq_num)
                     for c in clients:
                         if c.id == origin_id:
@@ -73,6 +79,7 @@ def msg_read(client):
                             c.close()
                             break
                 elif msg_type == "00000101": # MSG
+                    print(f"[MSG] mensagem recebida de {origin_id} para {destin_id}")
                     if destin_id == "00000000":
                         send_broadcast(origin_id, destin_id, message, client, seq_num)
                     else:
@@ -89,9 +96,13 @@ def msg_read(client):
                             send_back(destin_id, seq_num, message, client)                        
             else:
                 send_ERRO(origin_id, client, seq_num) 
-                print(f"[TEMP] {origin_id} não existe ou alguém tentou se passar por {origin_id}")
+                print(f"[ERROR] {origin_id} não existe ou alguém tentou se passar por {origin_id}")
     else:
-        print("[TEMP] mensagem ta vindo vazia") 
+        print("[ERROR] mensagem vazia") 
+
+# #########################################################
+# SEND FUNCTIONS
+# #########################################################
 
 def send_OK(id, cli, numseq):
     str_msg = "00000001" + ID + id + numseq + "OK"
@@ -103,8 +114,14 @@ def send_ERRO(id, cli, numseq):
 
 def send_unicast(oid, did, msg, cli, numseq):
     str_msg = "00000101" + oid + did + numseq + msg
+    for c in clients:
+        if c.id == did:
+            tmp = c
+            c.waiting = True
+            break
     sent = cli.send(str_msg.encode())
-    # esperar pelo ack
+    while tmp.waiting:     # esperar pelo ack
+        time.sleep(1)
 
 def send_broadcast(oid, did, msg, cli, numseq):
     for c in clients:
@@ -113,8 +130,10 @@ def send_broadcast(oid, did, msg, cli, numseq):
     send_OK(oid, cli, numseq)
 
 def send_back(destin, num, msg, cli):
-    str_msg = "00000101" + ID + destin + num + msg
-    sent = cli.send(str_msg.encode())
+    #str_msg = "00000101" + ID + destin + num + msg
+    #sent = cli.send(str_msg.encode())
+    print("[ERROR] destinatário não reconhecido")
+    send_unicast(ID, destin, msg, cli, num)
 
 # #########################################################
 # SERVER SET UP
