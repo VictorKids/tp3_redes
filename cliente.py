@@ -58,6 +58,15 @@ def read_input(sock):
         msg_count += 1
     elif in_str[0] == "S":
         global sel
+        end_msg = make_header(4, "1111111111111111") + "END"
+        sent    = sock.send(end_msg.encode())
+        while True:
+            ack = sock.recv(1024)
+            ack = ack.decode()
+            if ack[0:16] == "0000000000000001":
+                break
+            else:
+                print("[ERROR] servidor mandou uma msg que não é um ACK")
         sel.unregister(sock)
         sel.unregister(sys.stdin.fileno())
         sock.close()
@@ -87,6 +96,16 @@ sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.setblocking(False) #!!!!!!!!!!!!!!
 sock.connect_ex((serv_ip,serv_port))
 print("[SYNC] achei o servidor")
+hello_msg = make_header(3, "1111111111111111") + "oi"
+while True:
+    _ack = sock.recv(1024)
+    _ack = _ack.decode()
+    if _ack[0:16] == "0000000000000001":
+        print("[CONN] conexão com o servidor estabelecida")
+        break
+    else:
+        print("[ERROR] servidor mandou uma msg que não é um ACK")
+_ = sock.send(hello_msg.encode())
 sel.register(sock, selectors.EVENT_READ, data="rede")
 sel.register(sys.stdin.fileno(), selectors.EVENT_READ, data="input")
 
