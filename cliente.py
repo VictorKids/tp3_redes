@@ -80,7 +80,7 @@ sel = selectors.DefaultSelector()
 msg_count = 0
 
 id        = to_2bytes(int(sys.argv[1]))
-serv_ip   = int(sys.argv[2])
+serv_ip   = sys.argv[2]
 serv_port = int(sys.argv[3])
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
