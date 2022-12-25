@@ -13,7 +13,6 @@ class Clients:
     def __init__(self, id, socket):
         self.id = id
         self.socket = socket
-        self.waiting = False
 clients = []
 
 # #########################################################
@@ -23,7 +22,7 @@ clients = []
 def accept_wrapper(sock):
     conn, addr = sock.accept()
     print(f"[SYNC] recebendo conexão de {addr}")
-    conn.setblocking(False)
+    conn.setblocking(False) # <-----------------------------------------talvez essa linha tenha q ser deletada
     data = "oi_dorgival"
     sel.register(conn, selectors.EVENT_READ, data=data)
 
@@ -62,13 +61,9 @@ def msg_read(client):
                     break
             if security_check == True:
                 if   msg_type == "0000000000000010": # ERRO
-                    print("[ERROR] cliente não deveria mandar msgs do tipo ERRO ao servidor")
+                    print(f"[ERROR] cliente {origin_id} não deveria mandar msgs do tipo ERRO ao servidor")
                 elif msg_type == "0000000000000001": # OK
-                    print("[ACK] confirmação recebida")
-                    for c in clients:
-                        if c.id == destin_id:
-                            c.wating = False
-                            break
+                    print(f"[ACK] confirmação recebida de {origin_id}")
                 elif msg_type == "0000000000000100": # FLW
                     print(f"[DCONN] desconectando cliente {origin_id}")
                     send_OK(origin_id, client, seq_num)
@@ -86,14 +81,15 @@ def msg_read(client):
                         destin_flag = False
                         for c in clients:
                             if c.id == destin_id:
+                                tmp = c
                                 destin_flag = True
                                 break
                         if destin_flag:
                             send_OK(origin_id, client, seq_num)
-                            send_unicast(origin_id, destin_id, message, client, seq_num)
+                            send_unicast(origin_id, destin_id, message, tmp, seq_num)
                         else:
                             send_ERRO(origin_id, client, seq_num)
-                            send_back(destin_id, seq_num, message, client)                        
+                            send_back(origin_id, seq_num, message, client)                        
             else:
                 send_ERRO(origin_id, client, seq_num) 
                 print(f"[ERROR] {origin_id} não existe ou alguém tentou se passar por {origin_id}")
@@ -112,28 +108,29 @@ def send_ERRO(id, cli, numseq):
     str_msg = "0000000000000010" + ID + id + numseq + "ERRO"
     sent = cli.send(str_msg.encode())
 
-def send_unicast(oid, did, msg, cli, numseq):
+def send_unicast(oid, did, msg, d_cli, numseq):
     str_msg = "0000000000000101" + oid + did + numseq + msg
-    for c in clients:
-        if c.id == did:
-            tmp = c
-            c.waiting = True
+    sent = d_cli.send(str_msg.encode())
+    while(True):
+        ack  = d_cli.recv(1024)
+        ack  = ack.decode()
+        if ack[0:16] == "0000000000000001":
             break
-    sent = cli.send(str_msg.encode())
-    while tmp.waiting:     # esperar pelo ack -> acho q vai ficr block por conta de como o main loop funfa
-        time.sleep(1)
+        else:
+            print(f"{d_cli.id} mandou uma msg que não é um ACK")
 
 def send_broadcast(oid, did, msg, cli, numseq):
-    for c in clients:
-        if c.id != ID:
-            send_unicast(oid, did, msg, cli, numseq)
-    send_OK(oid, cli, numseq)
+    try:
+        for c in clients:
+            if c.id != ID:
+                send_unicast(oid, did, msg, c, numseq)
+        send_OK(oid, cli, numseq)
+    except:
+        send_ERRO(oid, cli, numseq)
 
-def send_back(destin, num, msg, cli):
-    #str_msg = "0000000000000101" + ID + destin + num + msg
-    #sent = cli.send(str_msg.encode())
+def send_back(oid, num, msg, cli):
     print("[ERROR] destinatário não reconhecido")
-    send_unicast(ID, destin, msg, cli, num)
+    send_unicast(ID, oid, msg, cli, num)
 
 # #########################################################
 # SERVER SET UP
@@ -147,7 +144,7 @@ serv.bind((HOST,PORT))
 serv.listen()
 serv.setblocking(False)
 sel.register(serv, selectors.EVENT_READ, data=None)
-clients.append(Clients(ID, serv)) #precisa?
+clients.append(Clients(ID, serv)) 
 
 # #########################################################
 # MAIN LOOP
@@ -159,7 +156,7 @@ try:
         for key, mask in events:
             if key.data is None:
                 accept_wrapper(key.fileobj) # key.fileobj == socket
-            else:                           # mask = event flag
+            else:                           
                 msg_read(key.fileobj)
 except KeyboardInterrupt:
     pass
