@@ -93,10 +93,11 @@ serv_ip   = sys.argv[2]
 serv_port = int(sys.argv[3])
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-sock.setblocking(False) #!!!!!!!!!!!!!!
+#sock.setblocking(False) #!!!!!!!!!!!!!!
 sock.connect_ex((serv_ip,serv_port))
 print("[SYNC] achei o servidor")
 hello_msg = make_header(3, "1111111111111111") + "oi"
+_ = sock.send(hello_msg.encode())
 while True:
     _ack = sock.recv(1024)
     _ack = _ack.decode()
@@ -105,7 +106,6 @@ while True:
         break
     else:
         print("[ERROR] servidor mandou uma msg que não é um ACK")
-_ = sock.send(hello_msg.encode())
 sel.register(sock, selectors.EVENT_READ, data="rede")
 sel.register(sys.stdin.fileno(), selectors.EVENT_READ, data="input")
 
@@ -115,12 +115,16 @@ sel.register(sys.stdin.fileno(), selectors.EVENT_READ, data="input")
 
 try:
     while True:
+        print("in loop")
         events = sel.select(timeout=None)
         if events:
+            print("there is a event")
             for key, mask in events:
                 if key.data == "rede":
+                    print("rede")
                     read_input(sock)
                 elif key.data == "input":
+                    print("input")
                     read_server()
 except:
-    pass
+    print("[ERROR] algo não funcionou bem..")

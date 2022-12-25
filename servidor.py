@@ -22,7 +22,7 @@ clients = []
 def accept_wrapper(sock):
     conn, addr = sock.accept()
     print(f"[SYNC] recebendo conexão de {addr}")
-    conn.setblocking(False) # <-----------------------------------------talvez essa linha tenha q ser deletada
+    #conn.setblocking(False) # <-----------------------------------------talvez essa linha tenha q ser deletada
     data = "oi_dorgival"
     sel.register(conn, selectors.EVENT_READ, data=data)
 
@@ -49,8 +49,10 @@ def msg_read(client):
                     break
             if new_id_flag:
                 clients.append(Clients(origin_id, client))
+                print("sending OK")
                 send_OK(origin_id, client, seq_num)
             else:
+                print("sending ERRO")
                 send_ERRO(origin_id, client, seq_num)
 
         else:
@@ -94,7 +96,7 @@ def msg_read(client):
                 send_ERRO(origin_id, client, seq_num) 
                 print(f"[ERROR] {origin_id} não existe ou alguém tentou se passar por {origin_id}")
     else:
-        print("[ERROR] mensagem vazia") 
+        pass #print("[ERROR] mensagem vazia") 
 
 # #########################################################
 # SEND FUNCTIONS
@@ -138,11 +140,11 @@ def send_back(oid, num, msg, cli):
 
 PORT = int(sys.argv[1])
 HOST = socket.gethostbyname(socket.gethostname())
-
+print(HOST)
 serv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 serv.bind((HOST,PORT))
 serv.listen()
-serv.setblocking(False)
+#serv.setblocking(False)
 sel.register(serv, selectors.EVENT_READ, data=None)
 clients.append(Clients(ID, serv)) 
 
