@@ -111,7 +111,7 @@ def send_ERRO(id, cli, numseq):
 
 def send_unicast(oid, did, msg, d_cli, numseq):
     str_msg = "0000000000000101" + oid + did + numseq + msg
-    sent = d_cli.send(str_msg.encode())
+    sent = d_cli.socket.send(str_msg.encode())
     while(True):
         ack  = d_cli.recv(1024)
         ack  = ack.decode()
@@ -131,7 +131,10 @@ def send_broadcast(oid, did, msg, cli, numseq):
 
 def send_back(oid, num, msg, cli):
     print("[ERROR] destinatário não reconhecido")
-    send_unicast(ID, oid, msg, cli, num)
+    for c in clients:
+        if c.id == oid:
+            send_unicast(ID, oid, msg, c, num)
+            break
 
 # #########################################################
 # SERVER SET UP
