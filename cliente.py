@@ -130,8 +130,8 @@ while True:
     else:
         print("[ERROR] servidor mandou uma msg que não é um ACK")
 sel.register(sock, selectors.EVENT_READ, data="rede")
-#sel.register(sys.stdin.fileno(), selectors.EVENT_READ, data="input")
-
+sel.register(sys.stdin, selectors.EVENT_READ, data="input")
+# .fileno()
 # #########################################################
 # MAIN LOOP
 # #########################################################
