@@ -34,6 +34,11 @@ def make_header(t, did):
         type = "0000000000000101"
     return type + id + to_2bytes(int(did)) + to_2bytes(msg_count)
 
+def send_OK(did, sock, numseq):
+    global id
+    str_msg = "0000000000000001" + id + did + numseq + "OK"
+    sent = sock.send(str_msg.encode())
+
 # #########################################################
 # INPUT READ FUNCTION
 # #########################################################
@@ -78,8 +83,26 @@ def read_input(sock):
 # SERVER COMUNICATION FUNCTION
 # #########################################################
 
-def read_server():
-    pass
+def read_server(sock):
+    data = sock.recv(1024)
+    if data:
+        data = data.decode()
+        msg_type  = data[0:16]
+        origin_id = data[16:32]
+        destin_id = data[32:48]
+        seq_num   = data[48:64]
+        _message   = data[64:]
+        if msg_type == "0000000000000101": # MSG
+            msg_tam = _message[0:32]
+            message = _message[32:]
+            print(f"Mensagem de {origin_id}: {message}")
+            send_OK("1111111111111111", sock, seq_num)
+        elif msg_type == "0000000000000010": # ERRO
+            print("[ERROR] servidor reportou um erro")
+        else:
+            print("[ERROR] servidor mandou uma mensagem de tipo indefinido")
+    else:
+        pass
 
 # #########################################################
 # INITIAL SET UP
@@ -107,7 +130,7 @@ while True:
     else:
         print("[ERROR] servidor mandou uma msg que não é um ACK")
 sel.register(sock, selectors.EVENT_READ, data="rede")
-sel.register(sys.stdin.fileno(), selectors.EVENT_READ, data="input")
+#sel.register(sys.stdin.fileno(), selectors.EVENT_READ, data="input")
 
 # #########################################################
 # MAIN LOOP
@@ -125,6 +148,6 @@ try:
                     read_input(sock)
                 elif key.data == "input":
                     print("input")
-                    read_server()
+                    read_server(sock)
 except:
     print("[ERROR] algo não funcionou bem..")

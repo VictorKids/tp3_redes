@@ -1,7 +1,6 @@
 import sys
 import socket
 import selectors
-import time
 
 # #########################################################
 # UTILITIES
