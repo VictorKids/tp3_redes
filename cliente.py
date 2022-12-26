@@ -59,7 +59,7 @@ def read_input(sock):
             if ack[0:16] == "0000000000000001":
                 break
             else:
-                print("[ERROR] servidor mandou uma msg que não é um ACK")
+                print("[ERROR] Servidor mandou uma msg que não é um ACK.")
         msg_count += 1
     elif in_str[0] == "S":
         global sel
@@ -71,13 +71,13 @@ def read_input(sock):
             if ack[0:16] == "0000000000000001":
                 break
             else:
-                print("[ERROR] servidor mandou uma msg que não é um ACK")
+                print("[ERROR] Servidor mandou uma msg que não é um ACK.")
         sel.unregister(sock)
         sel.unregister(sys.stdin.fileno())
         sock.close()
-        sys.exit("[END] encerrando cliente")
+        sys.exit("[END] Encerrando cliente.")
     else:
-        print(f"[ERROR] {in_str[0]} não é um comando válido")
+        print(f"[ERROR] {in_str[0]} não é um comando válido.")
 
 # #########################################################
 # SERVER COMUNICATION FUNCTION
@@ -95,12 +95,12 @@ def read_server(sock):
         if msg_type == "0000000000000101": # MSG
             msg_tam = _message[0:32]
             message = _message[32:]
-            print(f"Mensagem de {origin_id}: {message}")
+            print(f"[RECV] Mensagem de {origin_id}: {message}.")
             send_OK("1111111111111111", sock, seq_num)
         elif msg_type == "0000000000000010": # ERRO
-            print("[ERROR] servidor reportou um erro")
+            print("[ERROR] Servidor reportou um erro.")
         else:
-            print("[ERROR] servidor mandou uma mensagem de tipo indefinido")
+            print("[ERROR] Servidor mandou uma mensagem de tipo indefinido.")
     else:
         pass
 
@@ -116,38 +116,31 @@ serv_ip   = sys.argv[2]
 serv_port = int(sys.argv[3])
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#sock.setblocking(False) #!!!!!!!!!!!!!!
 sock.connect_ex((serv_ip,serv_port))
-print("[SYNC] achei o servidor")
+print("[SYNC] Achei o servidor.")
 hello_msg = make_header(3, "1111111111111111") + "oi"
 _ = sock.send(hello_msg.encode())
 while True:
     _ack = sock.recv(1024)
     _ack = _ack.decode()
     if _ack[0:16] == "0000000000000001":
-        print("[CONN] conexão com o servidor estabelecida")
+        print("[CONN] Conexão com o servidor estabelecida.")
         break
     else:
-        print("[ERROR] servidor mandou uma msg que não é um ACK")
+        print("[ERROR] Servidor mandou uma msg que não é um ACK.")
 sel.register(sock, selectors.EVENT_READ, data="rede")
 sel.register(sys.stdin, selectors.EVENT_READ, data="input")
-# .fileno()
+
 # #########################################################
 # MAIN LOOP
 # #########################################################
 
-try:
-    while True:
-        print("in loop")
-        events = sel.select(timeout=None)
-        if events:
-            print("there is a event")
-            for key, mask in events:
-                if key.data == "rede":
-                    print("rede")
-                    read_input(sock)
-                elif key.data == "input":
-                    print("input")
-                    read_server(sock)
-except:
-    print("[ERROR] algo não funcionou bem..")
+while True:
+    events = sel.select(timeout=None)
+    if events:
+        for key, mask in events:
+            if key.data == "input":
+                read_input(sock)
+            elif key.data == "rede":
+                read_server(sock)
+

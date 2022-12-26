@@ -9,9 +9,10 @@ import selectors
 sel = selectors.DefaultSelector()
 ID   = "1111111111111111"
 class Clients:
-    def __init__(self, id, socket):
+    def __init__(self, id, socket, info):
         self.id = id
         self.socket = socket
+        self.info = info
 clients = []
 
 # #########################################################
@@ -20,8 +21,7 @@ clients = []
 
 def accept_wrapper(sock):
     conn, addr = sock.accept()
-    print(f"[SYNC] recebendo conexão de {addr}")
-    #conn.setblocking(False) # <-----------------------------------------talvez essa linha tenha q ser deletada
+    print(f"[SYNC] recebendo conexão de {addr}.")
     data = "oi_dorgival"
     sel.register(conn, selectors.EVENT_READ, data=data)
 
@@ -40,43 +40,41 @@ def msg_read(client):
         message   = data[64:]
 
         if msg_type == "0000000000000011": # OI
-            print(f"[CONN] mensagem do tipo OI recebida de {origin_id}")
+            print(f"[CONN] mensagem do tipo OI recebida de {origin_id}.")
             new_id_flag = True
             for c in clients:
                 if c.id == origin_id:
                     new_id_flag = False
                     break
             if new_id_flag:
-                clients.append(Clients(origin_id, client))
-                print("sending OK")
+                clients.append(Clients(origin_id, client, client.getsockname()))
                 send_OK(origin_id, client, seq_num)
             else:
-                print("sending ERRO")
                 send_ERRO(origin_id, client, seq_num)
 
         else:
             security_check = False
             for c in clients:
-                if c.id == origin_id and c.socket == client:
-                    security_check == True
+                if c.id == origin_id and c.info == client.getsockname():
+                    security_check = True
                     break
             if security_check == True:
                 if   msg_type == "0000000000000010": # ERRO
-                    print(f"[ERROR] cliente {origin_id} não deveria mandar msgs do tipo ERRO ao servidor")
-                elif msg_type == "0000000000000001": # OK
-                    print(f"[ACK] confirmação recebida de {origin_id}")
+                    print(f"[ERROR] cliente {origin_id} não deveria mandar msgs do tipo ERRO ao servidor.")
+                elif msg_type == "0000000000000001": # OK 
+                    print(f"[ACK] confirmação recebida de {origin_id}.")
                 elif msg_type == "0000000000000100": # FLW
-                    print(f"[DCONN] desconectando cliente {origin_id}")
+                    print(f"[DCONN] desconectando cliente {origin_id}.")
                     send_OK(origin_id, client, seq_num)
                     for c in clients:
                         if c.id == origin_id:
-                            client.remove(c)
-                            sel.unregister(c)
-                            c.close()
+                            sel.unregister(c.socket)
+                            clients.remove(c)
+                            client.close()
                             break
                 elif msg_type == "0000000000000101": # MSG
-                    print(f"[MSG] mensagem recebida de {origin_id} para {destin_id}")
-                    if destin_id == "00000000":
+                    print(f"[MSG] mensagem recebida de {origin_id} para {destin_id}.")
+                    if destin_id == "0000000000000000":
                         send_broadcast(origin_id, destin_id, message, client, seq_num)
                     else:
                         destin_flag = False
@@ -93,9 +91,9 @@ def msg_read(client):
                             send_back(origin_id, seq_num, message, client)                        
             else:
                 send_ERRO(origin_id, client, seq_num) 
-                print(f"[ERROR] {origin_id} não existe ou alguém tentou se passar por {origin_id}")
+                print(f"[ERROR] {origin_id} não existe ou alguém tentou se passar por {origin_id}.")
     else:
-        pass #print("[ERROR] mensagem vazia") 
+        pass  
 
 # #########################################################
 # SEND FUNCTIONS
@@ -113,24 +111,24 @@ def send_unicast(oid, did, msg, d_cli, numseq):
     str_msg = "0000000000000101" + oid + did + numseq + msg
     sent = d_cli.socket.send(str_msg.encode())
     while(True):
-        ack  = d_cli.recv(1024)
+        ack  = d_cli.socket.recv(1024)
         ack  = ack.decode()
         if ack[0:16] == "0000000000000001":
             break
         else:
-            print(f"{d_cli.id} mandou uma msg que não é um ACK")
+            print(f"[ERROR] {d_cli.id} mandou uma msg que não é um ACK.")
 
 def send_broadcast(oid, did, msg, cli, numseq):
     try:
         for c in clients:
-            if c.id != ID:
+            if c.id != ID and c.id != oid:
                 send_unicast(oid, did, msg, c, numseq)
         send_OK(oid, cli, numseq)
     except:
         send_ERRO(oid, cli, numseq)
 
 def send_back(oid, num, msg, cli):
-    print("[ERROR] destinatário não reconhecido")
+    print("[ERROR] destinatário não reconhecido.")
     for c in clients:
         if c.id == oid:
             send_unicast(ID, oid, msg, c, num)
@@ -142,27 +140,24 @@ def send_back(oid, num, msg, cli):
 
 PORT = int(sys.argv[1])
 HOST = socket.gethostbyname(socket.gethostname())
-print(HOST)
+print("\n")
+print(f"IP do servidor: {HOST}")
+print("\n")
 serv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 serv.bind((HOST,PORT))
 serv.listen()
-#serv.setblocking(False)
 sel.register(serv, selectors.EVENT_READ, data=None)
-clients.append(Clients(ID, serv)) 
+clients.append(Clients(ID, serv, serv.getsockname())) 
 
 # #########################################################
 # MAIN LOOP
 # #########################################################
 
-try:
-    while True:
-        events = sel.select(timeout=None)
-        for key, mask in events:
-            if key.data is None:
-                accept_wrapper(key.fileobj) # key.fileobj == socket
-            else:                           
-                msg_read(key.fileobj)
-except KeyboardInterrupt:
-    pass
-finally:
-    sel.close()
+while True:
+    events = sel.select(timeout=None)
+    for key, mask in events:
+        if key.data is None:
+            accept_wrapper(key.fileobj) # key.fileobj == socket
+        else:                           
+            msg_read(key.fileobj)
+
